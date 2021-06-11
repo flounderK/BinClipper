@@ -18,6 +18,7 @@ log.addHandler(_handler)
 log.setLevel(logging.WARNING)
 
 
+# TODO: set outpath(name tbd) as a property
 class BinMod(ABC):
     def __init__(self):
         pass
@@ -32,6 +33,13 @@ class BinMod(ABC):
         f.seek(0)
         sys.stdout.buffer.write(f.read())
 
+    def close(self):
+        if hasattr(self.outpath, 'closed') and not self.outpath.closed:
+            self.outpath.close()
+        # if not self.inpath.closed:
+        #     self.inpath.close()
+
+
 
 class Clip(BinMod):
     def __init__(self, inpath, outpath, seek=0, number=-1, io_size=0x1000):
@@ -44,18 +52,11 @@ class Clip(BinMod):
         self.io_size = io_size
 
     def perform_binmod(self):
-        numread = 0
-        readsize = self.io_size if self.number < 0 else self.number
         with open(self.inpath, "rb") as read_fd:
             write_fd = self.outpath
             read_fd.seek(self.seek)
-            while read_fd.readable():
-                rd = read_fd.read(readsize)
-                numread += len(rd)
-                write_fd.write(rd)
-                if numread >= self.number:
-                    break
-
+            rd = read_fd.read(self.number)
+            write_fd.write(rd)
             read_fd.close()
 
 
@@ -91,13 +92,13 @@ def process_byte_input(input_mode, byte_input):
         return binascii.unhexlify(byte_input)
 
     byte_input = int(byte_input, 0)
-    if input_mode == 'u8':
+    if input_mode in ['8', 'u8', 's8', 'b', 'B', 'c']:
         ctypes_val = ctypes.c_uint8(byte_input)
-    elif input_mode == 'u16':
+    elif input_mode in ['16', 'u16', 's16', 'h', 'H']:
         ctypes_val = ctypes.c_uint16(byte_input)
-    elif input_mode == 'u32':
+    elif input_mode in ['32', 'u32', 's32', 'i', 'I']:
         ctypes_val = ctypes.c_uint32(byte_input)
-    elif input_mode == 'u64':
+    elif input_mode in ['64', 'u64', 's32', 'q', 'Q']:
         ctypes_val = ctypes.c_uint64(byte_input)
     else:
         raise NotImplementedError("byte input mode not implemented")
@@ -144,9 +145,14 @@ if __name__ == "__main__":
                                         "the inverse of the \"clip\" command")
     search_parser = subparsers.add_parser("search",
                                           help="Just search for patterns")
+    # TODO: decide on input to support chains
 
     BYTE_INPUT_MODES = ['hex',
-                        'u8', 'u16', 'u32', 'u64']
+                        '8', 'u8', 's8', 'b', 'B', 'c',
+                        '16', 'u16', 's16', 'h', 'H',
+                        '32', 'u32', 's32', 'i', 'I',
+                        '64', 'u64', 's64', 'q', 'Q']
+
     BYTE_INPUT_MODES_HELP = "Format of your input. By specifying one of the " \
                             "word options (u64 etc.) the size of your output is set " \
                             "to the size of that word type. All word options are " \
@@ -192,6 +198,7 @@ if __name__ == "__main__":
     handler.perform_binmod()
     if args.print is True:
         handler.write_to_stdout()
+    handler.close()
 
 
 
