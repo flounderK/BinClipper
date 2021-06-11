@@ -22,6 +22,12 @@ BYTE_INPUT_SIZE_16 = ['16', 'u16', 's16', 'h', 'H']
 BYTE_INPUT_SIZE_32 = ['32', 'u32', 's32', 'i', 'I']
 BYTE_INPUT_SIZE_64 = ['64', 'u64', 's64', 'q', 'Q']
 
+INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
+                               2: BYTE_INPUT_SIZE_16,
+                               4: BYTE_INPUT_SIZE_32,
+                               8: BYTE_INPUT_SIZE_64}
+
+
 
 # TODO: set outpath(name tbd) as a property
 class BinMod(ABC):
@@ -124,6 +130,11 @@ class Search(BinMod):
     def write_to_stdout(self):
         pass
 
+
+def get_byte_size_of_input_mode(input_mode):
+    for size, modes in INPUT_MODE_BYTE_SIZE_LOOKUP.items():
+        if input_mode in modes:
+            return size
 
 
 
