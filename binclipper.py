@@ -17,6 +17,11 @@ _handler.setFormatter(logging.Formatter("%(levelname)-7s | %(message)s"))
 log.addHandler(_handler)
 log.setLevel(logging.WARNING)
 
+BYTE_INPUT_SIZE_8 = ['8', 'u8', 's8', 'b', 'B', 'c']
+BYTE_INPUT_SIZE_16 = ['16', 'u16', 's16', 'h', 'H']
+BYTE_INPUT_SIZE_32 = ['32', 'u32', 's32', 'i', 'I']
+BYTE_INPUT_SIZE_64 = ['64', 'u64', 's64', 'q', 'Q']
+
 
 # TODO: set outpath(name tbd) as a property
 class BinMod(ABC):
@@ -97,7 +102,8 @@ class Replace(BinMod):
         read_fd.seek(self.number, 1)
         write_fd.write(read_fd.read())
 
-# TODO: this probably shouldn't actually inherit from BinMod
+# TODO: this probably shouldn't actually inherit from BinMod, add new class `BinRead`
+# TODO: for this and the `Read` class
 class Search(BinMod):
     def __init__(self, inpath, outpath, search_for_bytes, seek=0, number=-1):
         assert isinstance(search_for_bytes, bytes)
@@ -130,13 +136,13 @@ def process_byte_input(input_mode, byte_input):
         return binascii.unhexlify(byte_input)
 
     byte_input = int(byte_input, 0)
-    if input_mode in ['8', 'u8', 's8', 'b', 'B', 'c']:
+    if input_mode in BYTE_INPUT_SIZE_8:
         ctypes_val = ctypes.c_uint8(byte_input)
-    elif input_mode in ['16', 'u16', 's16', 'h', 'H']:
+    elif input_mode in BYTE_INPUT_SIZE_16:
         ctypes_val = ctypes.c_uint16(byte_input)
-    elif input_mode in ['32', 'u32', 's32', 'i', 'I']:
+    elif input_mode in BYTE_INPUT_SIZE_32:
         ctypes_val = ctypes.c_uint32(byte_input)
-    elif input_mode in ['64', 'u64', 's32', 'q', 'Q']:
+    elif input_mode in BYTE_INPUT_SIZE_64:
         ctypes_val = ctypes.c_uint64(byte_input)
     else:
         raise NotImplementedError("byte input mode not implemented")
@@ -186,11 +192,11 @@ if __name__ == "__main__":
                                           help="Just search for patterns")
     # TODO: decide on input to support chains
 
-    BYTE_INPUT_MODES = ['hex',
-                        '8', 'u8', 's8', 'b', 'B', 'c',
-                        '16', 'u16', 's16', 'h', 'H',
-                        '32', 'u32', 's32', 'i', 'I',
-                        '64', 'u64', 's64', 'q', 'Q']
+    BYTE_INPUT_MODES = ['hex'] + \
+                       BYTE_INPUT_SIZE_8 + \
+                       BYTE_INPUT_SIZE_16 + \
+                       BYTE_INPUT_SIZE_32 + \
+                       BYTE_INPUT_SIZE_64
 
     BYTE_INPUT_MODES_HELP = "Format of your input. By specifying one of the " \
                             "word options (u64 etc.) the size of your output is set " \
@@ -227,7 +233,8 @@ if __name__ == "__main__":
     subparser_handlers = {"clip": Clip,
                           "replace": Replace,
                           "drop": None,
-                          "search": Search}
+                          "search": Search,
+                          "read": None}
     # run handler
     handler_class = subparser_handlers.get(args.subparser)
     if handler_class is None:
