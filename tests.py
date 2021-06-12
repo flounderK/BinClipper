@@ -37,6 +37,23 @@ class TestReplaceByOffset(unittest.TestCase):
         self.assertEqual(byte_output, expected_byte_output)
 
 
+class TestSearch(unittest.TestCase):
+    def setUp(self):
+        self.inp = b'A'*8 + b'B'*4 + b'C'*2 + b'D'*1 + b'E'*16 + b'A'
+        self.inpath = io.BytesIO(self.inp)
+
+    def tearDown(self):
+        self.inpath.close()
+
+    def test_search(self):
+        search_pattern = b'A'
+        searcher = binclipper.Search(self.inpath, None, search_pattern)
+        searcher.perform_binmod()
+        self.assertEqual(searcher.found_offsets, [0, 1, 2, 3, 4, 5, 6, 7, len(self.inp) - 1])
+
+
+
+
 class TestArgumentParsing(unittest.TestCase):
     def test_replace_args(self):
         in_args = ['-s', '15', 'infile', '--print', 'replace', '64', '0x4444444444444444']
