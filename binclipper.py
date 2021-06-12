@@ -188,6 +188,8 @@ def process_byte_input(input_mode, byte_input):
 
 def validate_additional_arg_assertions(args):
     """Things that argparse doesn't support out of the box"""
+    # python3.6 argparse prevents getting here, but the intermixed args options
+    # will allow for it
     if args.outpath is None:
         args.print = True
     # if args.outpath is None and args.print is False:
