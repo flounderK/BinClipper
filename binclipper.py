@@ -28,8 +28,6 @@ INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
                                8: BYTE_INPUT_SIZE_64}
 
 
-
-# TODO: set outpath(name tbd) as a property
 class BinMod(ABC):
     def __init__(self):
         pass
@@ -39,15 +37,31 @@ class BinMod(ABC):
     def perform_binmod(self):
         pass
 
+    @property
+    def inbuf(self):
+        return self._inbuf
+
+    @inbuf.setter
+    def inbuf(self, value):
+        self._inbuf = value
+
+    @property
+    def outbuf(self):
+        return self._outbuf
+
+    @outbuf.setter
+    def outbuf(self, value):
+        self._outbuf = value
+
     def write_to_stdout(self):
         f = self.outbuf
         f.seek(0)
         sys.stdout.buffer.write(f.read())
 
-    def open(self):
-        pass
-
     def _get_file_like(self, inp, open_mode):
+        """Depending on the type of input, return something that can be
+        treated like a file descriptor (with access mode `open_mode` used
+        if relevant)"""
         ret = None
         if isinstance(inp, io.BytesIO) and not inp.closed:
             ret = inp
