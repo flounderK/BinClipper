@@ -27,6 +27,12 @@ INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
                                4: BYTE_INPUT_SIZE_32,
                                8: BYTE_INPUT_SIZE_64}
 
+BYTE_INPUT_MODES = ['hex'] + \
+                   BYTE_INPUT_SIZE_8 + \
+                   BYTE_INPUT_SIZE_16 + \
+                   BYTE_INPUT_SIZE_32 + \
+                   BYTE_INPUT_SIZE_64
+
 
 class BinMod(ABC):
     def __init__(self):
@@ -185,7 +191,7 @@ def validate_additional_arg_assertions(args):
         # raise argparse.ArgumentError("Either outpath or print must be provided")
 
 
-if __name__ == "__main__":
+def parse_args(arguments):
     parser = argparse.ArgumentParser()
     parser.add_argument("inpath", help="Path of file you want to modify")
     parser.add_argument("outpath", help="Path of output", nargs="?")
@@ -217,12 +223,6 @@ if __name__ == "__main__":
                                           help="Just search for patterns")
     # TODO: decide on input to support chains
 
-    BYTE_INPUT_MODES = ['hex'] + \
-                       BYTE_INPUT_SIZE_8 + \
-                       BYTE_INPUT_SIZE_16 + \
-                       BYTE_INPUT_SIZE_32 + \
-                       BYTE_INPUT_SIZE_64
-
     BYTE_INPUT_MODES_HELP = "Format of your input. By specifying one of the " \
                             "word options (u64 etc.) the size of your output is set " \
                             "to the size of that word type. All word options are " \
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", default=False)
     # set clip as the default behavior
     subparsers.default = "clip"
-    args = parser.parse_args()
+    args = parser.parse_args(arguments)
     if args.debug is True:
         log.setLevel(logging.DEBUG)
     log.debug(args)
@@ -254,6 +254,11 @@ if __name__ == "__main__":
     elif args.subparser == 'search':
         args.search_for_bytes = process_byte_input(args.byte_input_mode, args.input_bytes)
 
+    return args
+
+
+if __name__ == "__main__":
+    args = parse_args(sys.argv[1:])
     # dictionary mapping subparser name to class that will perform behavior
     subparser_handlers = {"clip": Clip,
                           "replace": Replace,
@@ -273,6 +278,4 @@ if __name__ == "__main__":
     if args.print is True:
         handler.write_to_stdout()
     handler.close_all()
-
-
 
