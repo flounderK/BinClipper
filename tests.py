@@ -52,6 +52,29 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(searcher.found_offsets, [0, 1, 2, 3, 4, 5, 6, 7, len(self.inp) - 1])
 
 
+class TestClip(unittest.TestCase):
+    def setUp(self):
+        self.inp_1 = b'A'*8
+        self.inp_2 = b'B'*4
+        self.inp_3 = b'C'*2
+        self.inp_4 = b'D'*1
+        self.inp_5 = b'E'*16
+        self.inp = self.inp_1 + self.inp_2 + self.inp_3 + self.inp_4 + self.inp_5
+        self.inpath = io.BytesIO(self.inp)
+        self.outpath = io.BytesIO()
+
+    def tearDown(self):
+        self.inpath.close()
+
+    def test_clip(self):
+        seek = random.randrange(0, len(self.inp))
+        number = random.randrange(seek, len(self.inp)) - seek
+        clipper = binclipper.Clip(self.inpath, self.outpath, seek=seek, number=number)
+        clipper.perform_binmod()
+        clipper.outbuf.seek(0)
+        output = clipper.outbuf.read()
+        expected_output = self.inp[seek:seek+number]
+        self.assertEqual(expected_output, output)
 
 
 class TestArgumentParsing(unittest.TestCase):
