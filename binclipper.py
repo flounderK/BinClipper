@@ -138,6 +138,7 @@ class Search(BinMod):
         self.search_for_bytes = search_for_bytes
         self.seek = seek
         self.number = number
+        self.found_offsets = []
 
     def perform_binmod(self):
         read_fd = self.inbuf
@@ -145,10 +146,11 @@ class Search(BinMod):
         rd = read_fd.read()
         escaped_search_for_bytes = re.escape(self.search_for_bytes)
         for match in re.finditer(escaped_search_for_bytes, rd):
-            print("Found at offset %#x" % match.start())
+            self.found_offsets.append(match.start())
 
     def write_to_stdout(self):
-        pass
+        for i in self.found_offsets:
+            print("Found at offset %#x" % i)
 
 
 def get_byte_size_of_input_mode(input_mode):
@@ -186,8 +188,10 @@ def process_byte_input(input_mode, byte_input):
 
 def validate_additional_arg_assertions(args):
     """Things that argparse doesn't support out of the box"""
-    if args.outpath is None and args.print is False:
-        raise Exception("Either outpath or print must be provided")
+    if args.outpath is None:
+        args.print = True
+    # if args.outpath is None and args.print is False:
+    #     raise Exception("Either outpath or print must be provided")
         # raise argparse.ArgumentError("Either outpath or print must be provided")
 
 
@@ -195,7 +199,7 @@ def parse_args(arguments):
     parser = argparse.ArgumentParser()
     parser.add_argument("inpath", help="Path of file you want to modify")
     parser.add_argument("outpath", help="Path of output", nargs="?")
-    parser.add_argument("--print", action="store_true", default=False,
+    parser.add_argument("-p", "--print", action="store_true", default=False,
                         help="Print out selected bytes instead of an out file. "
                         "using this option without an outpath will just output "
                         "everything to standard output")
