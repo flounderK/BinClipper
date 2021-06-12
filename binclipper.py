@@ -199,6 +199,8 @@ def parse_args(arguments):
     parser = argparse.ArgumentParser()
     parser.add_argument("inpath", help="Path of file you want to modify")
     parser.add_argument("outpath", help="Path of output", nargs="?")
+    # this has to remain to force argparse to move to the next argument after
+    # outpath so that outpath can remain an optional positional argument
     parser.add_argument("-p", "--print", action="store_true", default=False,
                         help="Print out selected bytes instead of an out file. "
                         "using this option without an outpath will just output "
