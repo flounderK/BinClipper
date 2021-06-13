@@ -82,6 +82,9 @@ class TestArgumentParsing(unittest.TestCase):
         in_args = ['-s', '15', 'infile', '--print', 'replace', '64', '0x4444444444444444']
         binclipper.parse_args(in_args)
 
+        in_args = ['-s', '15', 'infile', 'outfile', 'replace', '64', '0x4444444444444444']
+        binclipper.parse_args(in_args)
+
     def test_search_args(self):
         in_args = ['infile', '--print', 'search', 'hex', '6c6c']
         binclipper.parse_args(in_args)

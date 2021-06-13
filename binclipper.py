@@ -198,7 +198,7 @@ def validate_additional_arg_assertions(args):
 
 
 def parse_args(arguments):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("inpath", help="Path of file you want to modify")
     parser.add_argument("outpath", help="Path of output", nargs="?")
     # this has to remain to force argparse to move to the next argument after
@@ -224,12 +224,20 @@ def parse_args(arguments):
                                            "offset of seek. If NUMBER is not provided "
                                            "or is -1, the NUMBER of bytes replaced will "
                                            "be set to the size of the replacing bytes")
-    drop_parser = subparsers.add_parser("drop",
-                                        help="Ignore \"selected\" bytes, "
-                                        "the inverse of the \"clip\" command")
+    # waiting on this subparser until the more important features are fleshed out
+    # drop_parser = subparsers.add_parser("drop",
+    #                                     help="Ignore \"selected\" bytes, "
+    #                                     "the inverse of the \"clip\" command")
     search_parser = subparsers.add_parser("search",
                                           help="Just search for patterns")
     # TODO: decide on input to support chains
+
+    EXAMPLE_TEXT = """Examples:
+        {0} -s 15 infile.bin outfile.patched.bin replace 64 0x4444444444444444
+            ^^^ Replace a qword (8 bytes) 15 bytes into the file with 0x4444444444444444
+        {0} infile.bin -p search hex deadbeef
+            ^^^ Search for and print offsets of all instances of \\xde\\xad\\xbe\\xef (big endian) in the binary
+    """.format(parser.prog)
 
     BYTE_INPUT_MODES_HELP = "Format of your input. By specifying one of the " \
                             "word options (u64 etc.) the size of your output is set " \
@@ -250,6 +258,7 @@ def parse_args(arguments):
     parser.add_argument("--debug", action="store_true", default=False)
     # set clip as the default behavior
     subparsers.default = "clip"
+    parser.epilog = EXAMPLE_TEXT
     args = parser.parse_args(arguments)
     if args.debug is True:
         log.setLevel(logging.DEBUG)
