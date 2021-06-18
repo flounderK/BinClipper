@@ -27,7 +27,7 @@ INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
                                4: BYTE_INPUT_SIZE_32,
                                8: BYTE_INPUT_SIZE_64}
 
-BYTE_INPUT_MODES = ['hex'] + \
+BYTE_INPUT_MODES = ['hex', 'file'] + \
                    BYTE_INPUT_SIZE_8 + \
                    BYTE_INPUT_SIZE_16 + \
                    BYTE_INPUT_SIZE_32 + \
@@ -167,6 +167,10 @@ def process_byte_input(input_mode, byte_input):
     pack = struct.pack
     if input_mode == 'hex':
         return binascii.unhexlify(byte_input)
+    if input_mode == 'file':
+        with open(byte_input, "rb") as f:
+            content = f.read()
+        return content
 
     byte_input = int(byte_input, 0)
     if input_mode in BYTE_INPUT_SIZE_8:
