@@ -30,9 +30,9 @@ optional arguments:
   --debug
 
 Examples:
-        binclipper.py -s 15 infile.bin outfile.patched.bin replace 64 0x4444444444444444
+        binclipper.py -s 15 infile.bin outfile.patched.bin replace 64:0x4444444444444444
             ^^^ Replace a qword (8 bytes) 15 bytes into the file with 0x4444444444444444
-        binclipper.py infile.bin -p search hex deadbeef
+        binclipper.py infile.bin -p search hex:deadbeef
             ^^^ Search for and print offsets of all instances of \xde\xad\xbe\xef (big endian) in the binary
 
 ```
