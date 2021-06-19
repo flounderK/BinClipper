@@ -6,7 +6,7 @@ This script is meant to be a tool to help patch binaries, find patterns in binar
 
 
 ## Help:
-```bash
+```python
 usage: binclipper.py [-h] [-p] [-s SEEK] [-n NUMBER] [--debug]
                      inpath [outpath] {clip,replace,search} ...
 
