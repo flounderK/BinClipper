@@ -160,8 +160,19 @@ def get_byte_size_of_input_mode(input_mode):
 
 
 
-def process_byte_input(input_mode, byte_input):
-    """Handle the byte input and output bytes"""
+def process_byte_input_and_mode(byte_input_and_mode):
+    """Take in a string containing a combination of a byte input mode and a byte input.
+    This takes a form  like 'hex:6c6c' or 'u64:0x4444444'. The byte input mode determines
+    what the byte input should be interpreted as"""
+
+    split_byte_input_and_mode = byte_input_and_mode.split(':', 1)
+    if len(split_byte_input_and_mode) <= 1:
+        raise Exception("Byte input and mode must be in the format '<mode>:<input>'")
+    input_mode, byte_input = split_byte_input_and_mode
+
+    if input_mode not in BYTE_INPUT_MODES:
+        raise Exception("Byte input mode must be one of the following: %s" % repr(BYTE_INPUT_MODES))
+
     byte_output = None
     ctypes_val = None
     pack = struct.pack
@@ -237,27 +248,24 @@ def parse_args(arguments):
     # TODO: decide on input to support chains
 
     EXAMPLE_TEXT = """Examples:
-        {0} -s 15 infile.bin outfile.patched.bin replace 64 0x4444444444444444
+        {0} -s 15 infile.bin outfile.patched.bin replace 64:0x4444444444444444
             ^^^ Replace a qword (8 bytes) 15 bytes into the file with 0x4444444444444444
-        {0} infile.bin -p search hex deadbeef
+        {0} infile.bin -p search hex:deadbeef
             ^^^ Search for and print offsets of all instances of \\xde\\xad\\xbe\\xef (big endian) in the binary
     """.format(parser.prog)
 
-    BYTE_INPUT_MODES_HELP = "Format of your input. By specifying one of the " \
+    BYTE_INPUT_MODES_HELP = "Format of your input in the form '<mode>:<input>' " \
+                            "By specifying one of the " \
                             "word options (u64 etc.) the size of your output is set " \
                             "to the size of that word type. All word options are " \
-                            "implicitly little endian"
+                            "implicitly little endian. " \
+                            "Input modes: %s" % repr(BYTE_INPUT_MODES).replace("'", "").replace("[", "").replace("]", "")
 
-    replace_parser.add_argument("replace_with_mode", choices=BYTE_INPUT_MODES,
-                                help=BYTE_INPUT_MODES_HELP)
     replace_parser.add_argument("replace_with_bytes",
-                                help="The value that you are replacing the "
-                                "selected bytes with")
+                                type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
 
-    search_parser.add_argument("byte_input_mode", choices=BYTE_INPUT_MODES,
-                               help=BYTE_INPUT_MODES_HELP)
-    search_parser.add_argument("input_bytes",
-                               help="The value that you are searching for")
+    search_parser.add_argument("search_for_bytes",
+                               type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
 
     parser.add_argument("--debug", action="store_true", default=False)
     # set clip as the default behavior
@@ -268,12 +276,6 @@ def parse_args(arguments):
         log.setLevel(logging.DEBUG)
     log.debug(args)
     validate_additional_arg_assertions(args)
-
-    if args.subparser == 'replace':
-        # TODO: dirty, fix
-        args.replace_with_bytes = process_byte_input(args.replace_with_mode, args.replace_with_bytes)
-    elif args.subparser == 'search':
-        args.search_for_bytes = process_byte_input(args.byte_input_mode, args.input_bytes)
 
     return args
 
