@@ -109,11 +109,12 @@ class Clip(BinMod):
 
 
 class Replace(BinMod):
-    def __init__(self, inpath, outpath, replace_with_bytes, seek=0, number=-1):
+    def __init__(self, inpath, outpath, replace_with_bytes, replace_pattern=None, seek=0, number=-1):
         assert isinstance(replace_with_bytes, bytes)
         self.inbuf = self._get_file_like(inpath, "rb")
         self.outbuf = self._get_file_like(outpath, "wb")
         self.replace_with_bytes = replace_with_bytes
+        self.replace_pattern = replace_pattern
         self.seek = seek
         # default to the size of replace with bytes so that the size of the end file won't change
         self.number = number if number != -1 else len(replace_with_bytes)
@@ -123,10 +124,22 @@ class Replace(BinMod):
         write_fd = self.outbuf
         rd = read_fd.read(self.seek)
         write_fd.write(rd)
-        write_fd.write(self.replace_with_bytes)
-        # current pos + number
-        read_fd.seek(self.number, 1)
-        write_fd.write(read_fd.read())
+
+        if self.replace_pattern is None:
+            write_fd.write(self.replace_with_bytes)
+            # current pos + number
+            read_fd.seek(self.number, 1)
+            remainder = read_fd.read()
+        else:
+            number = 0 if self.number == -1 else self.number
+            remainder = read_fd.read()
+            log.debug("remainder: %s", remainder)
+            escaped_replace_pattern = re.escape(self.replace_pattern)
+            log.debug("escaped replace pattern %s"  % repr(escaped_replace_pattern))
+            remainder, _ = re.subn(escaped_replace_pattern, self.replace_with_bytes, remainder, number)
+
+        write_fd.write(remainder)
+
 
 # TODO: this probably shouldn't actually inherit from BinMod, add new class `BinRead`
 # TODO: for this and the `Read` class
@@ -235,10 +248,16 @@ def parse_args(arguments):
     clip_parser = subparsers.add_parser("clip",
                                         help="Copy \"selected\" bytes to output")
     replace_parser = subparsers.add_parser("replace",
-                                           help="Replace NUMBER bytes at the "
+                                           help="Replace bytes with the ones that you provide. "
+                                           "If replace pattern is not provided, replaces "
+                                           "NUMBER bytes at the "
                                            "offset of seek. If NUMBER is not provided "
                                            "or is -1, the NUMBER of bytes replaced will "
-                                           "be set to the size of the replacing bytes")
+                                           "be set to the size of the replacing bytes. "
+                                           "If replace pattern is provided, replaces "
+                                           "the bytes provided with your input bytes "
+                                           "NUMBER times, or all instances if NUMBER "
+                                           "is left -1")
     # waiting on this subparser until the more important features are fleshed out
     # drop_parser = subparsers.add_parser("drop",
     #                                     help="Ignore \"selected\" bytes, "
@@ -263,6 +282,9 @@ def parse_args(arguments):
 
     replace_parser.add_argument("replace_with_bytes",
                                 type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
+
+    replace_parser.add_argument("-m", "--replace-pattern", type=process_byte_input_and_mode,
+                                help=BYTE_INPUT_MODES_HELP)
 
     search_parser.add_argument("search_for_bytes",
                                type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
