@@ -5,11 +5,13 @@ import re
 import sys
 import functools
 from abc import ABC, abstractmethod
+from collections import namedtuple
 import binascii
 import struct
 import ctypes
 import io
 import logging
+import base64
 
 log = logging.getLogger("BinClipper")
 _handler = logging.StreamHandler()
@@ -21,17 +23,31 @@ BYTE_INPUT_SIZE_8 = ['8', 'u8', 's8', 'b', 'B', 'c']
 BYTE_INPUT_SIZE_16 = ['16', 'u16', 's16', 'h', 'H']
 BYTE_INPUT_SIZE_32 = ['32', 'u32', 's32', 'i', 'I']
 BYTE_INPUT_SIZE_64 = ['64', 'u64', 's64', 'q', 'Q']
+BYTE_INPUT_BASE64 = ['b64', 'base64']
 
 INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
                                2: BYTE_INPUT_SIZE_16,
                                4: BYTE_INPUT_SIZE_32,
                                8: BYTE_INPUT_SIZE_64}
 
-BYTE_INPUT_MODES = ['hex', 'file'] + \
+BYTE_INPUT_MODES = ['cstring', 'hex', 'file'] + \
+                   BYTE_INPUT_BASE64 + \
                    BYTE_INPUT_SIZE_8 + \
                    BYTE_INPUT_SIZE_16 + \
                    BYTE_INPUT_SIZE_32 + \
                    BYTE_INPUT_SIZE_64
+
+ClipArgs = namedtuple("ClipArgs", ["inpath", "outpath", "seek", "number"])
+ClipArgs.__new__.__defaults__ = (-1, 0)
+
+ReplaceArgs = namedtuple("ReplaceArgs", ["inpath", "outpath",
+                                         "replace_with_bytes",
+                                         "replace_pattern", "seek", "number"])
+ReplaceArgs.__new__.__defaults__ = (-1, 0, None)
+
+SearchArgs = namedtuple("SearchArgs", ["inpath", "outpath",
+                                       "search_for_bytes", "seek", "number"])
+SearchArgs.__new__.__defaults__ = (-1, 0)
 
 
 class BinMod(ABC):
@@ -195,6 +211,14 @@ def process_byte_input_and_mode(byte_input_and_mode):
         with open(byte_input, "rb") as f:
             content = f.read()
         return content
+    if input_mode == 'cstring':
+        byte_input = byte_input.encode()
+        if not byte_input.endswith(b'\x00'):
+            byte_input = byte_input + b'\x00'
+            return byte_input
+    if input_mode in BYTE_INPUT_BASE64:
+        byte_input = base64.b64decode(byte_input)
+        return byte_input
 
     byte_input = int(byte_input, 0)
     if input_mode in BYTE_INPUT_SIZE_8:
@@ -278,7 +302,7 @@ def parse_args(arguments):
                             "word options (u64 etc.) the size of your output is set " \
                             "to the size of that word type. All word options are " \
                             "implicitly little endian. " \
-                            "Input modes: %s" % repr(BYTE_INPUT_MODES).replace("'", "").replace("[", "").replace("]", "")
+                            "Input modes: %s" % ', '.join([i for i in BYTE_INPUT_MODES])
 
     replace_parser.add_argument("replace_with_bytes",
                                 type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
