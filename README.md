@@ -8,12 +8,12 @@ This script is meant to be a tool to help patch binaries, find patterns in binar
 ## Help:
 ```python
 usage: binclipper.py [-h] [-p] [-s SEEK] [-n NUMBER] [--debug]
-                     inpath [outpath] {clip,replace,search} ...
+                     inpath [outpath] {clip,replace,search,chain} ...
 
 positional arguments:
   inpath                Path of file you want to modify
   outpath               Path of output
-  {clip,replace,search}
+  {clip,replace,search,chain}
     clip                Copy "selected" bytes to output
     replace             Replace bytes with the ones that you provide. If
                         replace pattern is not provided, replaces NUMBER bytes
@@ -24,6 +24,8 @@ positional arguments:
                         bytes NUMBER times, or all instances if NUMBER is left
                         -1
     search              Just search for patterns
+    chain               Process a chain of multiple binary modification
+                        operations
 
 optional arguments:
   -h, --help            show this help message and exit
