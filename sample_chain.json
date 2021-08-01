@@ -1,0 +1,12 @@
+[
+  {
+    "op": "replace",
+    "replace_with_bytes": "cstring:BLAHHHH",
+    "replace_pattern": "hex:48656c6c6f"
+  },
+  {
+    "op": "replace",
+    "replace_with_bytes": "cstring:OHHHHHHHH",
+	"replace_pattern": "hex:7368656c6c"
+  }
+]
