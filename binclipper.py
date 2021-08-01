@@ -11,6 +11,7 @@ import struct
 import ctypes
 import io
 import logging
+import json
 import base64
 
 log = logging.getLogger("BinClipper")
@@ -18,6 +19,16 @@ _handler = logging.StreamHandler()
 _handler.setFormatter(logging.Formatter("%(levelname)-7s | %(message)s"))
 log.addHandler(_handler)
 log.setLevel(logging.WARNING)
+
+JSON_INPUT_FORMAT = """[
+    {"op": "clip"},
+    {"op": "replace",
+     "replace_with_bytes": "cstring:blah",
+     "replace_pattern": "cstring:ABCDEFG"},
+    {"op": "replace",
+     "replace_with_bytes": "hex:4141",
+     "seek": 4096}
+]"""
 
 BYTE_INPUT_SIZE_8 = ['8', 'u8', 's8', 'b', 'B', 'c']
 BYTE_INPUT_SIZE_16 = ['16', 'u16', 's16', 'h', 'H']
@@ -38,16 +49,27 @@ BYTE_INPUT_MODES = ['cstring', 'hex', 'file'] + \
                    BYTE_INPUT_SIZE_64
 
 ClipArgs = namedtuple("ClipArgs", ["inpath", "outpath", "seek", "number"])
-ClipArgs.__new__.__defaults__ = (-1, 0)
+ClipArgs.__new__.__defaults__ = (0, -1)
 
 ReplaceArgs = namedtuple("ReplaceArgs", ["inpath", "outpath",
                                          "replace_with_bytes",
                                          "replace_pattern", "seek", "number"])
-ReplaceArgs.__new__.__defaults__ = (-1, 0, None)
+ReplaceArgs.__new__.__defaults__ = (None, 0, -1)
 
 SearchArgs = namedtuple("SearchArgs", ["inpath", "outpath",
                                        "search_for_bytes", "seek", "number"])
-SearchArgs.__new__.__defaults__ = (-1, 0)
+SearchArgs.__new__.__defaults__ = (0, -1)
+
+ChainArgs = namedtuple("ChainArgs", ["inpath", "outpath", "chain_description",
+                                     "seek", "number"])
+ChainArgs.__new__.__defaults__ = (0, -1)
+
+
+REQUIRED_REPLACE_ARGS = ReplaceArgs._fields[:len(ReplaceArgs._fields) - len(ReplaceArgs.__new__.__defaults__)]
+REQUIRED_CLIP_ARGS = ClipArgs._fields[:len(ClipArgs._fields) - len(ClipArgs.__new__.__defaults__)]
+REQUIRED_SEARCH_ARGS = SearchArgs._fields[:len(SearchArgs._fields) - len(SearchArgs.__new__.__defaults__)]
+
+ALL_ARG_PARAMETERS = set(ClipArgs._fields + ReplaceArgs._fields + SearchArgs._fields + ChainArgs._fields)
 
 
 class BinMod(ABC):
@@ -86,6 +108,7 @@ class BinMod(ABC):
         if relevant)"""
         ret = None
         if isinstance(inp, io.BytesIO) and not inp.closed:
+            inp.seek(0)
             ret = inp
         elif isinstance(inp, str):
             ret = io.FileIO(inp, open_mode)
@@ -188,6 +211,78 @@ def get_byte_size_of_input_mode(input_mode):
             return size
 
 
+def validate_and_create_argtype(op, descriptor_dict):
+    required_args = None
+    argtype = None
+    if op == 'replace':
+        required_args = REQUIRED_REPLACE_ARGS
+        argtype = ReplaceArgs
+    elif op == 'clip':
+        required_args = REQUIRED_CLIP_ARGS
+        argtype = ClipArgs
+    elif op == 'search':
+        required_args = REQUIRED_SEARCH_ARGS
+        argtype = SearchArgs
+    else:
+        raise NotImplementedError("op %s not implemented" % op)
+
+    ignore_for_input_processing = ['inpath', 'outpath']
+
+    for k in list(required_args):
+        if k not in descriptor_dict.keys():
+            raise Exception("Required arg %s missing" % (k))
+
+    for k in list(descriptor_dict.keys()):
+        if k not in argtype._fields:
+            descriptor_dict.pop(k)
+            log.warning("Removing unknown key %s", k)
+
+        # if the value provided looks like the custom input format then
+        # process it
+        if k not in ignore_for_input_processing:
+            val = descriptor_dict[k]
+            if isinstance(val, str) and ':' in val:
+                descriptor_dict[k] = process_byte_input_and_mode(val)
+
+    new_arg = argtype(**descriptor_dict)
+    return new_arg
+
+
+def get_chain_args_from_json(json_path, inpath):
+    with open(os.path.expanduser(json_path), "r") as f:
+        content = json.load(f)
+
+    return get_chain_args(content, inpath)
+
+
+def get_chain_args(content, inpath):
+    if not isinstance(content, list):
+        raise Exception("Chain input must be in the format %s" % JSON_INPUT_FORMAT)
+
+    chain_args = []
+    inbuf = inpath
+    for i, dd in enumerate(content):
+        descriptor_dict = dd.copy()
+        if not isinstance(descriptor_dict, dict):
+            raise Exception("Entry %d is not a dict/mapping" % i)
+
+        if "op" not in descriptor_dict.keys():
+            raise Exception('"op" must be present as a key in every entry. It is missing from entry %d' % i)
+        # setup new output file descriptor
+        outbuf = io.BytesIO()
+
+        descriptor_dict['inpath'] = inbuf
+        descriptor_dict['outpath'] = outbuf
+
+        op = descriptor_dict.pop("op")
+        new_arg = validate_and_create_argtype(op, descriptor_dict)
+
+        chain_args.append(new_arg)
+        # setup input file descriptor for next link in the chain
+        inbuf = outbuf
+
+    return chain_args
+
 
 def process_byte_input_and_mode(byte_input_and_mode):
     """Take in a string containing a combination of a byte input mode and a byte input.
@@ -289,7 +384,9 @@ def parse_args(arguments):
     search_parser = subparsers.add_parser("search",
                                           help="Just search for patterns")
     # TODO: decide on input to support chains
-
+    chain_parser = subparsers.add_parser("chain",
+                                         help="Process a chain of multiple "
+                                         "binary modification operations")
     EXAMPLE_TEXT = """Examples:
         {0} -s 15 infile.bin outfile.patched.bin replace 64:0x4444444444444444
             ^^^ Replace a qword (8 bytes) 15 bytes into the file with 0x4444444444444444
@@ -305,13 +402,22 @@ def parse_args(arguments):
                             "Input modes: %s" % ', '.join([i for i in BYTE_INPUT_MODES])
 
     replace_parser.add_argument("replace_with_bytes",
-                                type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
+                                type=process_byte_input_and_mode,
+                                help=BYTE_INPUT_MODES_HELP)
 
-    replace_parser.add_argument("-m", "--replace-pattern", type=process_byte_input_and_mode,
+    replace_parser.add_argument("-m", "--replace-pattern",
+                                type=process_byte_input_and_mode,
                                 help=BYTE_INPUT_MODES_HELP)
 
     search_parser.add_argument("search_for_bytes",
-                               type=process_byte_input_and_mode, help=BYTE_INPUT_MODES_HELP)
+                               type=process_byte_input_and_mode,
+                               help=BYTE_INPUT_MODES_HELP)
+
+    chain_parser.add_argument("chain_description",
+                              help="Json input file describing the chain "
+                              "operations to use. Input should be in the "
+                              "format %s" % JSON_INPUT_FORMAT,
+                              type=os.path.expanduser)
 
     parser.add_argument("--debug", action="store_true", default=False)
     # set clip as the default behavior
@@ -333,7 +439,8 @@ if __name__ == "__main__":
                           "replace": Replace,
                           "drop": None,
                           "search": Search,
-                          "read": None}
+                          "read": None,
+                          "chain": None}
     # run handler
     handler_class = subparser_handlers.get(args.subparser)
     if handler_class is None:
