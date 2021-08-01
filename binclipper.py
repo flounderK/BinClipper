@@ -68,6 +68,7 @@ ChainArgs.__new__.__defaults__ = (0, -1)
 REQUIRED_REPLACE_ARGS = ReplaceArgs._fields[:len(ReplaceArgs._fields) - len(ReplaceArgs.__new__.__defaults__)]
 REQUIRED_CLIP_ARGS = ClipArgs._fields[:len(ClipArgs._fields) - len(ClipArgs.__new__.__defaults__)]
 REQUIRED_SEARCH_ARGS = SearchArgs._fields[:len(SearchArgs._fields) - len(SearchArgs.__new__.__defaults__)]
+REQUIRED_CHAIN_ARGS = ChainArgs._fields[:len(ChainArgs._fields) - len(ChainArgs.__new__.__defaults__)]
 
 ALL_ARG_PARAMETERS = set(ClipArgs._fields + ReplaceArgs._fields + SearchArgs._fields + ChainArgs._fields)
 
@@ -205,6 +206,34 @@ class Search(BinMod):
             print("Found at offset %#x" % i)
 
 
+class Chain(BinMod):
+    def __init__(self, inpath, outpath, chain_description, seek=0, number=-1):
+        self.chain_description = get_chain_args_from_json(chain_description, inpath)
+        self.inbuf = None
+        # self.inbuf = self._get_file_like(self.chain_description[0].inpath, "rb")
+        self.outbuf = self._get_file_like(self.chain_description[-1].outpath, "wb")
+        self.seek = seek
+        self.number = number
+
+    def perform_binmod(self):
+        for args in self.chain_description:
+            log.debug("Chain link args %s", str(args))
+            chain_link_handler = None
+            if isinstance(args, ClipArgs):
+                chain_link_handler = Clip(**args._asdict())
+            elif isinstance(args, ReplaceArgs):
+                chain_link_handler = Replace(**args._asdict())
+            elif isinstance(args, SearchArgs):
+                chain_link_handler = Search(**args._asdict())
+            else:
+                raise NotImplementedError()
+            chain_link_handler.perform_binmod()
+
+
+
+
+
+
 def get_byte_size_of_input_mode(input_mode):
     for size, modes in INPUT_MODE_BYTE_SIZE_LOOKUP.items():
         if input_mode in modes:
@@ -223,10 +252,13 @@ def validate_and_create_argtype(op, descriptor_dict):
     elif op == 'search':
         required_args = REQUIRED_SEARCH_ARGS
         argtype = SearchArgs
+    elif op == 'chain':
+        required_args = REQUIRED_CHAIN_ARGS
+        argtype = ChainArgs
     else:
         raise NotImplementedError("op %s not implemented" % op)
 
-    ignore_for_input_processing = ['inpath', 'outpath']
+    ignore_for_input_processing = ['inpath', 'outpath', 'chain_description']
 
     for k in list(required_args):
         if k not in descriptor_dict.keys():
@@ -440,15 +472,13 @@ if __name__ == "__main__":
                           "drop": None,
                           "search": Search,
                           "read": None,
-                          "chain": None}
+                          "chain": Chain}
     # run handler
     handler_class = subparser_handlers.get(args.subparser)
     if handler_class is None:
         raise NotImplementedError()
 
-    # Might be cursed because of undocumented reflection, but comes out clean
-    handler_args = handler_class.__init__.__code__.co_varnames
-    used_args = {k: v for k, v in args._get_kwargs() if k in handler_args}
+    used_args = {k: v for k, v in args._get_kwargs() if k in ALL_ARG_PARAMETERS}
     handler = handler_class(**used_args)
     handler.perform_binmod()
     if args.print is True:
