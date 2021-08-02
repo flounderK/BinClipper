@@ -230,10 +230,6 @@ class Chain(BinMod):
             chain_link_handler.perform_binmod()
 
 
-
-
-
-
 def get_byte_size_of_input_mode(input_mode):
     for size, modes in INPUT_MODE_BYTE_SIZE_LOOKUP.items():
         if input_mode in modes:
