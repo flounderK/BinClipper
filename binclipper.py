@@ -41,7 +41,7 @@ INPUT_MODE_BYTE_SIZE_LOOKUP = {1: BYTE_INPUT_SIZE_8,
                                4: BYTE_INPUT_SIZE_32,
                                8: BYTE_INPUT_SIZE_64}
 
-BYTE_INPUT_MODES = ['cstring', 'hex', 'file'] + \
+BYTE_INPUT_MODES = ['string', 'cstring', 'hex', 'file'] + \
                    BYTE_INPUT_BASE64 + \
                    BYTE_INPUT_SIZE_8 + \
                    BYTE_INPUT_SIZE_16 + \
@@ -343,6 +343,11 @@ def process_byte_input_and_mode(byte_input_and_mode):
         if not byte_input.endswith(b'\x00'):
             byte_input = byte_input + b'\x00'
             return byte_input
+
+    if input_mode == 'string':
+        byte_input = byte_input.encode()
+        return byte_input
+
     if input_mode in BYTE_INPUT_BASE64:
         byte_input = base64.b64decode(byte_input)
         return byte_input
