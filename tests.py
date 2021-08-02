@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import unittest
 import binclipper
+import binascii
+import string
 import io
 import random
 
@@ -93,6 +95,32 @@ class TestArgumentParsing(unittest.TestCase):
         in_args = ['-s', '15', 'testshellcode', '--print']
         binclipper.parse_args(in_args)
 
+
+class TestByteInputProcessing(unittest.TestCase):
+    def test_int_inputs(self):
+        res = binclipper.process_byte_input_and_mode('u8:150')
+        self.assertEqual(res, b'\x96')
+        res = binclipper.process_byte_input_and_mode('u32:0x11223344')
+        self.assertEqual(res, b'D3"\x11')
+
+    def test_int_input_truncation(self):
+        """smaller input types should auto truncate input"""
+        res = binclipper.process_byte_input_and_mode('u8:0x4444444444444444')
+        self.assertEqual(res, b'D')
+
+    def test_hex_inputs(self):
+        inp = 'hex:' + binascii.hexlify(string.ascii_letters.encode()).decode()
+        res = binclipper.process_byte_input_and_mode(inp).decode()
+        self.assertEqual(res, string.ascii_letters)
+
+    def test_string_inputs(self):
+        cstr_inp = 'cstring:blah'
+        res = binclipper.process_byte_input_and_mode(cstr_inp)
+        self.assertEqual(res, b'blah\x00')
+
+        str_inp = 'string:blah'
+        res = binclipper.process_byte_input_and_mode(str_inp)
+        self.assertEqual(res, b'blah')
 
 
 if __name__ == "__main__":
