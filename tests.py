@@ -7,6 +7,33 @@ import io
 import random
 
 
+class TestChain(unittest.TestCase):
+    def setUp(self):
+        self.inp = b'A'*8 + b'B'*4 + b'C'*2 + b'D'*1 + b'E'*16
+        self.inpath = io.BytesIO(self.inp)
+        self.outpath = io.BytesIO()
+
+    def tearDown(self):
+        self.inpath.close()
+        self.outpath.close()
+
+    def test_run_chain(self):
+        chain_ops = [{"op": "replace",
+                      "replace_with_bytes": "cstring:blah",
+                      "replace_pattern": "string:AAAAAAAABBBBC"},
+                     {"op": "replace",
+                      "replace_with_bytes": "hex:5858",
+                      "seek": 13}]
+        chain = object.__new__(binclipper.Chain)
+        chain.chain_description = binclipper.get_chain_args(chain_ops, self.inpath)
+        chain.outbuf = chain._get_file_like(chain.chain_description[-1].outpath, "wb")
+        chain.seek = 0
+        chain.number = -1
+        chain.perform_binmod()
+        chain.outbuf.seek(0)
+        self.assertEqual(chain.outbuf.read(), b'blah\x00CDEEEEEEXXEEEEEEEE')
+
+
 class TestReplaceByOffset(unittest.TestCase):
     def setUp(self):
         self.inp = b'A'*8 + b'B'*4 + b'C'*2 + b'D'*1 + b'E'*16
