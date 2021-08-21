@@ -20,7 +20,8 @@ class TestChain(unittest.TestCase):
     def test_run_chain(self):
         chain_ops = [{"op": "replace",
                       "replace_with_bytes": "cstring:blah",
-                      "replace_pattern": "string:AAAAAAAABBBBC"},
+                      "replace_pattern": "string:AAAAAAAABBBBC",
+                      "disable_elastic": True},
                      {"op": "replace",
                       "replace_with_bytes": "hex:5858",
                       "seek": 13}]
@@ -34,7 +35,7 @@ class TestChain(unittest.TestCase):
         self.assertEqual(chain.outbuf.read(), b'blah\x00CDEEEEEEXXEEEEEEEE')
 
 
-class TestReplaceByOffset(unittest.TestCase):
+class TestReplace(unittest.TestCase):
     def setUp(self):
         self.inp = b'A'*8 + b'B'*4 + b'C'*2 + b'D'*1 + b'E'*16
         self.inpath = io.BytesIO(self.inp)
@@ -58,11 +59,23 @@ class TestReplaceByOffset(unittest.TestCase):
     def test_replace_bytes_larger_than_input(self):
         byte_input = b'X'*4
         seek = 5
-        replacer = binclipper.Replace(self.inpath, self.outpath, byte_input, seek=seek, number=len(byte_input) + 3)
+        replacer = binclipper.Replace(self.inpath, self.outpath, byte_input, seek=seek, number=len(byte_input) + 3, disable_elastic=True)
         replacer.perform_binmod()
         replacer.outbuf.seek(0)
         byte_output = replacer.outbuf.read()
         expected_byte_output = self.inp[:seek] + byte_input + self.inp[replacer.number + seek:]
+        self.assertEqual(byte_output, expected_byte_output)
+
+    def test_replace_bytes_smaller_than_pattern(self):
+        byte_input = b'cat\x00'
+        replace_pattern = b'AAAAAAB'
+        replacer = binclipper.Replace(self.inpath, self.outpath, byte_input,
+                                      replace_pattern=replace_pattern,
+                                      disable_elastic=False)
+        replacer.perform_binmod()
+        replacer.outbuf.seek(0)
+        expected_byte_output = b'AAcat\x00AABBBB' + b'C'*2 + b'D' + b'E'*16
+        byte_output = replacer.outbuf.read()
         self.assertEqual(byte_output, expected_byte_output)
 
 

@@ -53,8 +53,9 @@ ClipArgs.__new__.__defaults__ = (0, -1)
 
 ReplaceArgs = namedtuple("ReplaceArgs", ["inpath", "outpath",
                                          "replace_with_bytes",
-                                         "replace_pattern", "seek", "number"])
-ReplaceArgs.__new__.__defaults__ = (None, 0, -1)
+                                         "replace_pattern", "seek", "number",
+                                         "disable_elastic"])
+ReplaceArgs.__new__.__defaults__ = (None, 0, -1, False)
 
 SearchArgs = namedtuple("SearchArgs", ["inpath", "outpath",
                                        "search_for_bytes", "seek", "number"])
@@ -149,7 +150,7 @@ class Clip(BinMod):
 
 
 class Replace(BinMod):
-    def __init__(self, inpath, outpath, replace_with_bytes, replace_pattern=None, seek=0, number=-1):
+    def __init__(self, inpath, outpath, replace_with_bytes, replace_pattern=None, seek=0, number=-1, disable_elastic=False):
         assert isinstance(replace_with_bytes, bytes)
         self.inbuf = self._get_file_like(inpath, "rb")
         self.outbuf = self._get_file_like(outpath, "wb")
@@ -158,6 +159,12 @@ class Replace(BinMod):
         self.seek = seek
         # default to the size of replace with bytes so that the size of the end file won't change
         self.number = number if number != -1 else len(replace_with_bytes)
+        self.disable_elastic = disable_elastic
+
+        if self.disable_elastic is False and self.replace_pattern is not None:
+            self.replace_with_bytes += self.replace_pattern[-(len(self.replace_pattern) - len(self.replace_with_bytes)):]
+            self.number = len(self.replace_with_bytes)
+            log.debug("replace with bytes %s", self.replace_with_bytes)
 
     def perform_binmod(self):
         read_fd = self.inbuf
@@ -181,8 +188,6 @@ class Replace(BinMod):
         write_fd.write(remainder)
 
 
-# TODO: this probably shouldn't actually inherit from BinMod, add new class `BinRead`
-# TODO: for this and the `Read` class
 class Search(BinMod):
     def __init__(self, inpath, outpath, search_for_bytes, seek=0, number=-1):
         assert isinstance(search_for_bytes, bytes)
@@ -312,6 +317,8 @@ def get_chain_args(content, inpath):
     return chain_args
 
 
+# TODO: add support for a new input type that works like hex,
+# TODO: but supports a wildcard character
 def process_byte_input_and_mode(byte_input_and_mode):
     """Take in a string containing a combination of a byte input mode and a byte input.
     This takes a form  like 'hex:6c6c' or 'u64:0x4444444'. The byte input mode determines
@@ -387,6 +394,8 @@ def parse_args(arguments):
                         help="Print out selected bytes instead of an out file. "
                         "using this option without an outpath will just output "
                         "everything to standard output")
+    # TODO: make outpath optional and print to stdout by default
+    # parser.add_argument("-o", "--outpath", )
     parser.add_argument("-s", "--seek",
                         help="Seek from the start of the binary to this offset "
                         "before starting your action",
@@ -441,6 +450,18 @@ def parse_args(arguments):
     replace_parser.add_argument("-m", "--replace-pattern",
                                 type=process_byte_input_and_mode,
                                 help=BYTE_INPUT_MODES_HELP)
+    replace_parser.add_argument("-e", "--disable-elastic",
+                                default=False, action="store_true",
+                                help="Disable elastic mode. "
+                                "Elastic mode will pad the size of replace with bytes "
+                                "in the event that it is smaller than the size of "
+                                "replace pattern "
+                                "so that the overall format of the binary is "
+                                "maintained. This argument depends on a replace pattern "
+                                "being used. "
+                                "This mostly matters if you are "
+                                "replacing the value of a string in a binary. "
+                                "Elastic mode also overrides the NUMBER argument ")
 
     search_parser.add_argument("search_for_bytes",
                                type=process_byte_input_and_mode,
