@@ -5,6 +5,14 @@ import binascii
 import string
 import io
 import random
+import logging
+import sys
+
+log = logging.getLogger("binclippertest")
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(levelname)-7s | %(message)s"))
+log.addHandler(_handler)
+log.setLevel(logging.DEBUG)
 
 
 class TestChain(unittest.TestCase):
@@ -40,42 +48,88 @@ class TestReplace(unittest.TestCase):
         self.inp = b'A'*8 + b'B'*4 + b'C'*2 + b'D'*1 + b'E'*16
         self.inpath = io.BytesIO(self.inp)
         self.outpath = io.BytesIO()
+        log.debug("")
+        log.debug("starting test")
 
     def tearDown(self):
+        log.debug("test done")
+        log.debug("")
         self.inpath.close()
         self.outpath.close()
 
     # TODO: add in printing a little bit of debug information if this fails
     def test_replace_bytes(self):
+        """Test replacing bytes by seek"""
+        log.debug("test_replace_bytes ")
+        log.debug("Original input: %s", self.inp)
         byte_input = b'X'*random.randrange(0, 16)
+        log.debug("byte_input %s", byte_input)
         seek = random.randrange(0, len(self.inp))
+        log.debug("seek %d", seek)
         replacer = binclipper.Replace(self.inpath, self.outpath, byte_input, seek=seek)
         replacer.perform_binmod()
         replacer.outbuf.seek(0)
         byte_output = replacer.outbuf.read()
+        log.debug("byte_output %s", byte_output)
         expected_byte_output = self.inp[:seek] + byte_input + self.inp[len(byte_input) + seek:]
+        log.debug("expected    %s", expected_byte_output)
         self.assertEqual(byte_output, expected_byte_output)
 
     def test_replace_bytes_larger_than_input(self):
+        """Test replace bytes by seek larger than input"""
+        log.debug("test_replace_bytes_larger_than_input")
+        log.debug("Original input: %s", self.inp)
         byte_input = b'X'*4
+        log.debug("byte_input %s", byte_input)
         seek = 5
+        log.debug("seek %s", seek)
         replacer = binclipper.Replace(self.inpath, self.outpath, byte_input, seek=seek, number=len(byte_input) + 3, disable_elastic=True)
         replacer.perform_binmod()
         replacer.outbuf.seek(0)
         byte_output = replacer.outbuf.read()
+        log.debug("byte_output %s", byte_output)
         expected_byte_output = self.inp[:seek] + byte_input + self.inp[replacer.number + seek:]
+        log.debug("expected    %s", expected_byte_output)
         self.assertEqual(byte_output, expected_byte_output)
 
     def test_replace_bytes_smaller_than_pattern(self):
+        """Test replace bytes with pattern"""
+        log.debug("test_replace_bytes_smaller_than_pattern")
+        log.debug("Original input: %s", self.inp)
         byte_input = b'cat\x00'
+        log.debug("byte_input %s", byte_input)
         replace_pattern = b'AAAAAAB'
+        log.debug("replace_pattern %s", replace_pattern)
         replacer = binclipper.Replace(self.inpath, self.outpath, byte_input,
                                       replace_pattern=replace_pattern,
                                       disable_elastic=False)
         replacer.perform_binmod()
         replacer.outbuf.seek(0)
-        expected_byte_output = b'AAcat\x00AABBBB' + b'C'*2 + b'D' + b'E'*16
         byte_output = replacer.outbuf.read()
+        log.debug("byte_output %s", byte_output)
+        expected_byte_output = b'AAcat\x00AABBBB' + b'C'*2 + b'D' + b'E'*16
+        log.debug("expected    %s", expected_byte_output)
+        self.assertEqual(byte_output, expected_byte_output)
+
+
+    def test_replace_bytes_equal_size_pattern(self):
+        """Test replace bytes with pattern"""
+        log.debug("test_replace_bytes_equal_size_pattern")
+        log.debug("Original input: %s", self.inp)
+        byte_input = b'cat\x00\x00\x00\x00'
+        log.debug("byte_input %s", byte_input)
+        replace_pattern = b'AAAAAAB'
+        log.debug("replace_pattern %s", replace_pattern)
+        self.assertEqual(len(byte_input), len(replace_pattern))
+        replacer = binclipper.Replace(self.inpath, self.outpath, byte_input,
+                                      replace_pattern=replace_pattern,
+                                      disable_elastic=False)
+        replacer.perform_binmod()
+        replacer.outbuf.seek(0)
+        byte_output = replacer.outbuf.read()
+        log.debug("byte_output %s", byte_output)
+        expected_byte_output = b'AAcat\x00\x00\x00\x00BBB' + b'C'*2 + b'D' + b'E'*16
+        log.debug("expected    %s", expected_byte_output)
         self.assertEqual(byte_output, expected_byte_output)
 
 
@@ -164,4 +218,16 @@ class TestByteInputProcessing(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # horrible hack to make the unittest.main output
+    # print out after logging is done
+    orig_stderr = sys.stderr
+    fake_stderr = io.StringIO()
+    sys.stderr = fake_stderr
+
+    unittest.main(exit=False)
+
+    # print unittest.main output and reset stderr
+    sys.stderr = orig_stderr
+    fake_stderr.seek(0)
+    orig_stderr.write(fake_stderr.read())
+

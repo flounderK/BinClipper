@@ -161,10 +161,15 @@ class Replace(BinMod):
         self.number = number if number != -1 else len(replace_with_bytes)
         self.disable_elastic = disable_elastic
 
-        if self.disable_elastic is False and self.replace_pattern is not None:
+        # pad the size of replace with bytes
+        # in the event that it is smaller than the size of
+        # replace pattern
+        if self.disable_elastic is False and self.replace_pattern is not None \
+            and len(self.replace_with_bytes) < len(self.replace_pattern):
             self.replace_with_bytes += self.replace_pattern[-(len(self.replace_pattern) - len(self.replace_with_bytes)):]
             self.number = len(self.replace_with_bytes)
-            log.debug("replace with bytes %s", self.replace_with_bytes)
+
+        log.debug("replace with bytes %s", self.replace_with_bytes)
 
     def perform_binmod(self):
         read_fd = self.inbuf
