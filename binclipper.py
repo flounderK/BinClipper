@@ -48,6 +48,8 @@ BYTE_INPUT_MODES = ['string', 'cstring', 'hex', 'file'] + \
                    BYTE_INPUT_SIZE_32 + \
                    BYTE_INPUT_SIZE_64
 
+# __new__.__defaults__ are right aligned, so they still appear in the same
+# order as in the tuple, but end at the rightmost parameter
 ClipArgs = namedtuple("ClipArgs", ["inpath", "outpath", "seek", "number"])
 ClipArgs.__new__.__defaults__ = (0, -1)
 
